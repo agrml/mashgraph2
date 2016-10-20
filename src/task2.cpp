@@ -4,11 +4,18 @@
 #include <cassert>
 #include <iostream>
 #include <cmath>
+#include <limits>
 
 #include "classifier.h"
 #include "EasyBMP.h"
 #include "linear.h"
 #include "argvparser.h"
+
+#include "Usable.h"
+
+#ifdef DEBUG
+#include <glog/logging.h>
+#endif
 
 using std::string;
 using std::vector;
@@ -76,9 +83,33 @@ void SavePredictions(const TFileList& file_list,
     stream.close();
 }
 
-// Exatract features from dataset.
-// You should implement this function by yourself =)
-void ExtractFeatures(const TDataSet& data_set, TFeatures* features) {
+/**
+ * Extract features from dataset.
+ * @param data_set vector of pairs of images and their lables
+ * @param features vector of gistograms and lables for images from data_set.
+ *                  The main aim of the function is to construct that vector.
+ */
+void ExtractFeatures(const TDataSet& data_set, TFeatures* features)
+{
+    for (const auto &elem : data_set) {
+        auto &img = *(elem.first);  // non-const reference because of BMP class architecture
+        const auto &label = elem.second;
+
+        // check input
+        assert(img.TellHeight() <= static_cast<long long int>(std::numeric_limits<uint>::max()) && img.TellHeight() >= 0);
+        assert(img.TellWidth() <= static_cast<long long int>(std::numeric_limits<uint>::max()) && img.TellWidth() >= 0);
+        auto n = static_cast<uint>(img.TellHeight());
+        auto m = static_cast<uint>(img.TellWidth());
+
+        // part1
+        auto img_matrix = grayscale(img);
+
+        // part2: Sobel convolution
+        auto xProj = sobel_x(img_matrix);
+        auto yProj = sobel_y(img_matrix);
+    }
+    LOG(INFO) << "hi";
+
     for (size_t image_idx = 0; image_idx < data_set.size(); ++image_idx) {
         
         // PLACE YOUR CODE HERE
@@ -125,8 +156,10 @@ void TrainClassifier(const string& data_file, const string& model_file) {
         // You can change parameters of classifier here
     params.C = 0.01;
     TClassifier classifier(params);
+
         // Train classifier
     classifier.Train(features, &model);
+
         // Save model to file
     model.Save(model_file);
         // Clear dataset structure
@@ -171,6 +204,11 @@ void PredictData(const string& data_file,
 }
 
 int main(int argc, char** argv) {
+#ifdef DEBUG
+    google::InitGoogleLogging(argv[0]);
+    google::InstallFailureSignalHandler();
+#endif
+
     // Command line options parser
     ArgvParser cmd;
         // Description of program
