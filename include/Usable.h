@@ -17,6 +17,34 @@ public:
     T operator()(const Matrix<T> &neighbourhood) const;
 };
 
+template <typename T>
+class CompareOp
+{
+public:
+    uint radius = 1;
+    uint &vert_radius = radius, &hor_radius = radius;
+    uint8_t operator()(const Matrix<T> &neighbourhood) const;
+};
+
+template <typename T>
+uint8_t CompareOp<T>::operator()(const Matrix<T> &neighbourhood) const
+{
+    // matrices "multiplication"
+    assert(neighbourhood.n_cols == neighbourhood.n_rows);
+    assert(radius == 1);
+
+    uint8_t sum = 0;
+    for (uint i = 0; i < 3 ; i++) {
+        for (uint j = 0; j < 3; j++) {
+            if (i != 1 && j != 1) {
+                sum <<= 1;
+                sum += (neighbourhood(i, j) <= neighbourhood(1, 1));
+            }
+        }
+    }
+    return sum;
+}
+
 // convolution filter
 template <typename T>
 Matrix<T> custom(Matrix<T> src_image, const Matrix<double> &kernel)

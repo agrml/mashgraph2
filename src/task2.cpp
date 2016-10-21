@@ -87,14 +87,14 @@ constexpr uint8_t N_SQUARES_PER_LINE = 8;
 constexpr uint8_t HIST_SZ = 8;
 
 /// assume same-sized matrixes as params
-std::vector<double> calcHistogram(const Matrix<double> &sqare,
-                                 const Matrix<double> &abs,
-                                 const Matrix<double> &angles,
-                                 uint histSz=HIST_SZ)
+std::vector<double> calcHistogramHog(const Matrix<double> &square,
+                                     const Matrix<double> &abs,
+                                     const Matrix<double> &angles,
+                                     uint histSz = HIST_SZ)
 {
-    std::vector<double> hist(histSz, static_cast<float>(0));
-    for (uint i = 0; i < sqare.n_rows; i++) {
-        for (uint j = 0; j < sqare.n_cols; j++) {
+    std::vector<double> hist(histSz, static_cast<double>(0));
+    for (uint i = 0; i < square.n_rows; i++) {
+        for (uint j = 0; j < square.n_cols; j++) {
             double tmpIdx = (static_cast<double>(M_PI) + angles(i, j)) * histSz / 2 / M_PI;
             uint idx = uint(tmpIdx) % histSz/*normalizeNumber(tmpIdx, static_cast<uint>(0), histSz - 1)*/;
             hist[idx] += abs(i, j);
@@ -121,6 +121,121 @@ void normaliseHist(vector<double> &hist)
     }
 }
 
+std::vector<float> calculateHog(BMP &img)
+{
+    auto n = static_cast<uint>(img.TellHeight());
+    auto m = static_cast<uint>(img.TellWidth());
+
+    // part1
+    auto imgMatrix = grayscale(img);
+
+    // part2: Sobel convolution
+    auto xProj = sobel_x(imgMatrix);
+    auto yProj = sobel_y(imgMatrix);
+
+    // part3: calculate gradients
+    /// gradients absolute values
+    Matrix<double> abs(n, m);
+    /// gradients directions
+    Matrix<double> angles(n, m);
+    for (uint i = 0; i < n; i++) {
+        for (uint j = 0; j < m; j++) {
+            abs(i, j) = std::sqrt(std::pow(xProj(i, j), 2) + std::pow(yProj(i, j), 2));
+            angles(i, j) = std::atan2(yProj(i,j), xProj(i, j));
+        }
+    }
+
+    // part4: calculate histograms
+    assert(n >= N_SQUARES_PER_LINE);
+    assert(m >= N_SQUARES_PER_LINE);
+    // iterate over squares
+    std::vector<std::vector<double>> hists;
+    for (uint i = 0, iStep = n / N_SQUARES_PER_LINE; i + iStep < n; i += iStep) {
+        for (uint j = 0, jStep = m / N_SQUARES_PER_LINE; j + jStep < m; j += iStep) {
+            auto hist = calcHistogramHog(imgMatrix.submatrix(i, j, iStep, jStep),
+                                         abs.submatrix(i, j, iStep, jStep),
+                                         angles.submatrix(i, j, iStep, jStep));
+            // part5: normalise hists
+            normaliseHist(hist);
+            hists.emplace_back(hist);
+        }
+    }
+
+    // part6: concatenate
+    std::vector<float> desc;
+    for (const auto &hist : hists) {
+        desc.insert(desc.end(), hist.begin(), hist.end());
+    }
+    return desc;
+}
+
+std::vector<double> calcHistogramLbp(const Matrix<double> &square)
+{
+    auto matrix = square.unary_map(CompareOp<double>{});
+    constexpr auto LbpHistSz = 256;
+    std::vector<double> hist(LbpHistSz, 0);
+    for (uint i = 0; i < matrix.n_rows; i++) {
+        for (uint j = 0; j < matrix.n_cols; j++) {
+            hist[matrix(i, j)]++;
+        }
+    }
+    return hist;
+}
+
+std::vector<uint> calculateLbp(BMP &img)
+{
+    auto n = static_cast<uint>(img.TellHeight());
+    auto m = static_cast<uint>(img.TellWidth());
+    assert(n >= N_SQUARES_PER_LINE);
+    assert(m >= N_SQUARES_PER_LINE);
+
+    auto imgMatrix = grayscale(img);
+
+    // iterate over squares
+    std::vector<std::vector<double>> hists;
+    for (uint i = 0, iStep = n / N_SQUARES_PER_LINE; i + iStep < n; i += iStep) {
+        for (uint j = 0, jStep = m / N_SQUARES_PER_LINE; j + jStep < m; j += iStep) {
+            auto hist = calcHistogramLbp(imgMatrix.submatrix(i, j, iStep, jStep));
+            normaliseHist(hist);
+            hists.emplace_back(hist);
+        }
+    }
+
+    // part6: concatenate
+    std::vector<uint> desc;
+    for (const auto &hist : hists) {
+        desc.insert(desc.end(), hist.begin(), hist.end());
+    }
+    return desc;
+}
+
+std::vector<uint> calculateColor(BMP &img)
+{
+    auto n = static_cast<uint>(img.TellHeight());
+    auto m = static_cast<uint>(img.TellWidth());
+    assert(n >= N_SQUARES_PER_LINE);
+    assert(m >= N_SQUARES_PER_LINE);
+
+    auto imgMatrix = grayscale(img);
+
+    // iterate over squares
+    std::vector<std::vector<double>> hists;
+    for (uint i = 0, iStep = n / N_SQUARES_PER_LINE; i + iStep < n; i += iStep) {
+        for (uint j = 0, jStep = m / N_SQUARES_PER_LINE; j + jStep < m; j += iStep) {
+            auto hist = calcHistogramLbp(imgMatrix.submatrix(i, j, iStep, jStep));
+            normaliseHist(hist);
+            hists.emplace_back(hist);
+        }
+    }
+
+    // part6: concatenate
+    std::vector<uint> desc;
+    for (const auto &hist : hists) {
+        desc.insert(desc.end(), hist.begin(), hist.end());
+    }
+    return desc;
+}
+
 /**
  * Extract features from dataset.
  * @param data_set vector of pairs <image, lable>
@@ -136,49 +251,14 @@ void ExtractFeatures(const TDataSet& data_set, TFeatures* features)
         // check input
         assert(img.TellHeight() <= static_cast<long long int>(std::numeric_limits<uint>::max()) && img.TellHeight() >= 0);
         assert(img.TellWidth() <= static_cast<long long int>(std::numeric_limits<uint>::max()) && img.TellWidth() >= 0);
-        auto n = static_cast<uint>(img.TellHeight());
-        auto m = static_cast<uint>(img.TellWidth());
+        auto hogDesc = calculateHog(img);
+        auto lbpDesc = calculateLbp(img);
+//        auto colorDesc = calculateColor(img);
 
-        // part1
-        auto imgMatrix = grayscale(img);
-
-        // part2: Sobel convolution
-        auto xProj = sobel_x(imgMatrix);
-        auto yProj = sobel_y(imgMatrix);
-
-        // part3: calculate gradients
-        /// gradients absolute values
-        Matrix<double> abs(n, m);
-        /// gradients directions
-        Matrix<double> angles(n, m);
-        for (uint i = 0; i < n; i++) {
-            for (uint j = 0; j < m; j++) {
-                abs(i, j) = std::sqrt(std::pow(xProj(i, j), 2) + std::pow(yProj(i, j), 2));
-                angles(i, j) = std::atan2(yProj(i,j), xProj(i, j));
-            }
-        }
-
-        // part4: calculate histograms
-        assert(n >= N_SQUARES_PER_LINE);
-        assert(m >= N_SQUARES_PER_LINE);
-        // iterate over squares
-        std::vector<std::vector<double>> hists;
-        for (uint i = 0, iStep = n / N_SQUARES_PER_LINE; i + iStep < n; i += iStep) {
-            for (uint j = 0, jStep = m / N_SQUARES_PER_LINE; j + jStep < m; j += iStep) {
-                auto hist = calcHistogram(imgMatrix.submatrix(i, j, iStep, jStep),
-                                          abs.submatrix(i, j, iStep, jStep),
-                                          angles.submatrix(i, j, iStep, jStep));
-                // part5: normalise hists
-                normaliseHist(hist);
-                hists.emplace_back(hist);
-            }
-        }
-
-        // part6: concatenate
         std::vector<float> desc;
-        for (const auto &hist : hists) {
-            desc.insert(desc.end(), hist.begin(), hist.end());
-        }
+        desc.insert(desc.end(), hogDesc.begin(), hogDesc.end());
+        desc.insert(desc.end(), lbpDesc.begin(), lbpDesc.end());
+//        desc.insert(desc.end(), colorDesc.begin(), colorDesc.end());
         features->emplace_back(std::make_pair(desc, label));
     }
 }
