@@ -4,15 +4,15 @@
 Matrix<double> grayscale(BMP &img)
 {
     constexpr double R_COEF = 0.229, G_COEF = 0.587, B_COEF = 0.144;
-    Matrix<double> img_matrix(static_cast<uint>(img.TellHeight()),
+    Matrix<double> imgMatrix(static_cast<uint>(img.TellHeight()),
                               static_cast<uint>(img.TellWidth()));
-    for (uint i = 0; i < img_matrix.n_rows; ++i) {
-        for (uint j = 0; j < img_matrix.n_cols; ++j) {
+    for (uint i = 0; i < imgMatrix.n_rows; ++i) {
+        for (uint j = 0; j < imgMatrix.n_cols; ++j) {
             RGBApixel *p = img(j, i);
-            img_matrix(i, j) = R_COEF * p->Red + G_COEF * p->Green + B_COEF * p->Blue;
+            imgMatrix(i, j) = R_COEF * p->Red + G_COEF * p->Green + B_COEF * p->Blue;
         }
     }
-    return img_matrix;
+    return imgMatrix;
 }
 
 

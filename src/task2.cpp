@@ -83,9 +83,47 @@ void SavePredictions(const TFileList& file_list,
     stream.close();
 }
 
+constexpr uint8_t N_SQUARES_PER_LINE = 8;
+constexpr uint8_t HIST_SZ = 8;
+
+/// assume same-sized matrixes as params
+std::vector<double> calcHistogram(const Matrix<double> &sqare,
+                                 const Matrix<double> &abs,
+                                 const Matrix<double> &angles,
+                                 uint histSz=HIST_SZ)
+{
+    std::vector<double> hist(histSz, static_cast<float>(0));
+    for (uint i = 0; i < sqare.n_rows; i++) {
+        for (uint j = 0; j < sqare.n_cols; j++) {
+            double tmpIdx = (static_cast<double>(M_PI) + angles(i, j)) * histSz / 2 / M_PI;
+            uint idx = uint(tmpIdx) % histSz/*normalizeNumber(tmpIdx, static_cast<uint>(0), histSz - 1)*/;
+            hist[idx] += abs(i, j);
+        }
+    }
+    return hist;
+}
+
+
+void normaliseHist(vector<double> &hist)
+{
+    double norm = 0;
+    for (const auto &elem : hist) {
+        norm += elem * elem;
+    }
+    norm = std::sqrt(norm);
+    for (auto &elem : hist) {
+        elem /= norm;
+        if (elem > 1 || std::isnan(elem)) {
+            elem = 1;
+        } else if (elem < 0) {
+            elem = 0;
+        }
+    }
+}
+
 /**
  * Extract features from dataset.
- * @param data_set vector of pairs of images and their lables
+ * @param data_set vector of pairs <image, lable>
  * @param features vector of gistograms and lables for images from data_set.
  *                  The main aim of the function is to construct that vector.
  */
@@ -102,23 +140,46 @@ void ExtractFeatures(const TDataSet& data_set, TFeatures* features)
         auto m = static_cast<uint>(img.TellWidth());
 
         // part1
-        auto img_matrix = grayscale(img);
+        auto imgMatrix = grayscale(img);
 
         // part2: Sobel convolution
-        auto xProj = sobel_x(img_matrix);
-        auto yProj = sobel_y(img_matrix);
-    }
-    LOG(INFO) << "hi";
+        auto xProj = sobel_x(imgMatrix);
+        auto yProj = sobel_y(imgMatrix);
 
-    for (size_t image_idx = 0; image_idx < data_set.size(); ++image_idx) {
-        
-        // PLACE YOUR CODE HERE
-        // Remove this sample code and place your feature extraction code here
-        vector<float> one_image_features;
-        one_image_features.push_back(1.0);
-        features->push_back(make_pair(one_image_features, 1));
-        // End of sample code
+        // part3: calculate gradients
+        /// gradients absolute values
+        Matrix<double> abs(n, m);
+        /// gradients directions
+        Matrix<double> angles(n, m);
+        for (uint i = 0; i < n; i++) {
+            for (uint j = 0; j < m; j++) {
+                abs(i, j) = std::sqrt(std::pow(xProj(i, j), 2) + std::pow(yProj(i, j), 2));
+                angles(i, j) = std::atan2(yProj(i,j), xProj(i, j));
+            }
+        }
 
+        // part4: calculate histograms
+        assert(n >= N_SQUARES_PER_LINE);
+        assert(m >= N_SQUARES_PER_LINE);
+        // iterate over squares
+        std::vector<std::vector<double>> hists;
+        for (uint i = 0, iStep = n / N_SQUARES_PER_LINE; i + iStep < n; i += iStep) {
+            for (uint j = 0, jStep = m / N_SQUARES_PER_LINE; j + jStep < m; j += iStep) {
+                auto hist = calcHistogram(imgMatrix.submatrix(i, j, iStep, jStep),
+                                          abs.submatrix(i, j, iStep, jStep),
+                                          angles.submatrix(i, j, iStep, jStep));
+                // part5: normalise hists
+                normaliseHist(hist);
+                hists.emplace_back(hist);
+            }
+        }
+
+        // part6: concatenate
+        std::vector<float> desc;
+        for (const auto &hist : hists) {
+            desc.insert(desc.end(), hist.begin(), hist.end());
+        }
+        features->emplace_back(std::make_pair(desc, label));
     }
 }
 

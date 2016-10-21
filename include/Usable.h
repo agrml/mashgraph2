@@ -30,11 +30,6 @@ Matrix<double> sobel_x(const Matrix<double> &src_image);
 Matrix<double> sobel_y(const Matrix<double> &src_image);
 
 
-//std::vector<std::pair<std::vector<double>, int>>
-//histogram(const Matrix<double> &img_matrix,
-//          const Matrix<double> &abs,
-//          const Matrix<double> &dirs,
-
 template <typename ResT, typename SrcT>
 ResT normalizeNumber(SrcT src,
                      ResT min=std::numeric_limits<ResT>::min(),
@@ -54,7 +49,7 @@ ResT normalizeNumber(SrcT src,
 
 template <typename T>
 ConvolutionOp<T>::ConvolutionOp(const Matrix<double> &kernel) : kernel_(kernel),
-                                                                radius(kernel.n_rows) {}
+                                                                radius((kernel.n_rows - 1) / 2) {}
 
 template <typename T>
 T ConvolutionOp<T>::operator()(const Matrix<T> &neighbourhood) const
@@ -63,11 +58,11 @@ T ConvolutionOp<T>::operator()(const Matrix<T> &neighbourhood) const
     assert(neighbourhood.n_cols == neighbourhood.n_rows);
     assert(radius == (neighbourhood.n_cols - 1) / 2);
 
-    double sum = 0;
-    for (size_t i = 0; i < radius; i++) {
-        for (size_t j = 0; j < radius; j++) {
+    T sum = 0;
+    for (size_t i = 0; i < 2 * radius + 1 ; i++) {
+        for (size_t j = 0; j < 2 * radius + 1; j++) {
             sum += neighbourhood(i, j) * kernel_(i, j);
         }
     }
-    return normalizeNumber(sum, T(0), std::numeric_limits<T>::max());
+    return sum;
 }
