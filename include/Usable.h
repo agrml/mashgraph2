@@ -40,7 +40,7 @@ uint8_t CompareOp<T>::operator()(const Matrix<T> &neighbourhood) const
         for (uint j = 0; j < 3; j++) {
             if (i != 1 && j != 1) {
                 sum <<= 1;
-                sum += (neighbourhood(i, j) <= neighbourhood(1, 1));
+                sum += (neighbourhood(1, 1) <= neighbourhood(i, j));
             }
         }
     }
@@ -58,24 +58,6 @@ Matrix<T> custom(Matrix<T> src_image, const Matrix<double> &kernel)
 Matrix<double> sobel_x(const Matrix<double> &src_image);
 
 Matrix<double> sobel_y(const Matrix<double> &src_image);
-
-
-template <typename ResT, typename SrcT>
-ResT normalizeNumber(SrcT src,
-                     ResT min=std::numeric_limits<ResT>::min(),
-                     ResT max=std::numeric_limits<ResT>::max())
-{
-    if (max < min) {
-        throw std::string{"normalizeNumber: max < min"};
-    }
-    if (src < min) {
-        return min;
-    }
-    if (src > max) {
-        return max;
-    }
-    return static_cast<ResT>(src);
-}
 
 template <typename T>
 ConvolutionOp<T>::ConvolutionOp(const Matrix<double> &kernel) : kernel_(kernel),

@@ -99,7 +99,7 @@ std::vector<double> calcHistogramHog(const Matrix<double> &square,
     for (uint i = 0; i < square.n_rows; i++) {
         for (uint j = 0; j < square.n_cols; j++) {
             double tmpIdx = (static_cast<double>(M_PI) + angles(i, j)) * HIST_SZ / 2 / M_PI;
-            uint idx = uint(tmpIdx) % HIST_SZ/*normalizeNumber(tmpIdx, static_cast<uint>(0), HIST_SZ - 1)*/;
+            uint idx = uint(tmpIdx) % HIST_SZ;
             hist[idx] += abs(i, j);
         }
     }
@@ -108,8 +108,8 @@ std::vector<double> calcHistogramHog(const Matrix<double> &square,
 
 std::vector<double> calcHistogramLbp(const Matrix<double> &square)
 {
-    auto matrix = square.unary_map(CompareOp<double>{});
     constexpr auto LBP_HIST_SZ = 256;
+    auto matrix = square.unary_map(CompareOp<double>{});
     std::vector<double> hist(LBP_HIST_SZ, static_cast<double>(0));
     for (uint i = 0; i < matrix.n_rows; i++) {
         for (uint j = 0; j < matrix.n_cols; j++) {
@@ -139,19 +139,14 @@ std::vector<double> calcHistogramColor(const Matrix<std::tuple<uint, uint, uint>
 
 void normaliseHist(vector<double> &hist)
 {
-    constexpr auto EPS = 0.00000001;
     double norm = 0;
     for (const auto &elem : hist) {
         norm += elem * elem;
     }
-    norm = std::sqrt(norm);
-    if (norm > EPS) {
+    if (norm > std::numeric_limits<double>::epsilon()) {
+        norm = std::sqrt(norm);
         for (auto &elem : hist) {
             elem /= norm;
-        }
-    } else {
-        for (auto &elem : hist) {
-            elem = 0;
         }
     }
 }
@@ -188,7 +183,7 @@ std::vector<float> calculateHog(BMP &img)
     // iterate over squares
     std::vector<float> desc;
     for (uint i = 0, iStep = n / N_SQUARES_PER_LINE; i + iStep <= n; i += iStep) {
-        for (uint j = 0, jStep = m / N_SQUARES_PER_LINE; j + jStep <= m; j += iStep) {
+        for (uint j = 0, jStep = m / N_SQUARES_PER_LINE; j + jStep <= m; j += jStep) {
             auto hist = calcHistogramHog(imgMatrix.submatrix(i, j, iStep, jStep),
                                          abs.submatrix(i, j, iStep, jStep),
                                          angles.submatrix(i, j, iStep, jStep));
@@ -208,15 +203,19 @@ std::vector<float> calculateLbp(BMP &img)
     n = n + (n % N_SQUARES_PER_LINE ? N_SQUARES_PER_LINE - n % N_SQUARES_PER_LINE : 0);
     m = m + (m % N_SQUARES_PER_LINE ? N_SQUARES_PER_LINE - m % N_SQUARES_PER_LINE : 0);
 
-    // part1
     auto imgMatrix = extraMatrix(grayscale(img), n, m);
 
+    // calculate histograms
+    assert(n >= N_SQUARES_PER_LINE);
+    assert(m >= N_SQUARES_PER_LINE);
     // iterate over squares
     std::vector<float> desc;
     for (uint i = 0, iStep = n / N_SQUARES_PER_LINE; i + iStep <= n; i += iStep) {
-        for (uint j = 0, jStep = m / N_SQUARES_PER_LINE; j + jStep <= m; j += iStep) {
+        for (uint j = 0, jStep = m / N_SQUARES_PER_LINE; j + jStep <= m; j += jStep) {
             auto hist = calcHistogramLbp(imgMatrix.submatrix(i, j, iStep, jStep));
+            // part5: normalise hists
             normaliseHist(hist);
+            // part6: concatenate
             desc.insert(desc.end(), hist.begin(), hist.end());
         }
     }
@@ -236,7 +235,7 @@ std::vector<float> calculateColor(BMP &img)
     // iterate over squares
     std::vector<float> desc;
     for (uint i = 0, iStep = n / N_SQUARES_PER_LINE; i + iStep <= n; i += iStep) {
-        for (uint j = 0, jStep = m / N_SQUARES_PER_LINE; j + jStep <= m; j += iStep) {
+        for (uint j = 0, jStep = m / N_SQUARES_PER_LINE; j + jStep <= m; j += jStep) {
             auto hist = calcHistogramColor(imgMatrix.submatrix(i, j, iStep, jStep));
             desc.insert(desc.end(), hist.begin(), hist.end());
         }
@@ -260,14 +259,14 @@ void ExtractFeatures(const TDataSet& data_set, TFeatures* features)
         assert(img.TellHeight() <= static_cast<long long int>(std::numeric_limits<uint>::max()) && img.TellHeight() >= 0);
         assert(img.TellWidth() <= static_cast<long long int>(std::numeric_limits<uint>::max()) && img.TellWidth() >= 0);
 
-//        auto hogDesc = calculateHog(img);
+        auto hogDesc = calculateHog(img);
         auto lbpDesc = calculateLbp(img);
-//        auto colorDesc = calculateColor(img);
+        auto colorDesc = calculateColor(img);
 
         std::vector<float> desc;
-//        desc.insert(desc.end(), hogDesc.begin(), hogDesc.end());
+        desc.insert(desc.end(), hogDesc.begin(), hogDesc.end());
         desc.insert(desc.end(), lbpDesc.begin(), lbpDesc.end());
-//        desc.insert(desc.end(), colorDesc.begin(), colorDesc.end());
+        desc.insert(desc.end(), colorDesc.begin(), colorDesc.end());
         features->emplace_back(std::make_pair(desc, label));
     }
 }
