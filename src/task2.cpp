@@ -15,6 +15,8 @@
 
 #ifdef DEBUG
 #include <glog/logging.h>
+#include <iomanip>
+
 #endif
 
 using std::string;
@@ -83,24 +85,55 @@ void SavePredictions(const TFileList& file_list,
     stream.close();
 }
 
+//**********************************Okay, my code starts here********************************************
+
 constexpr uint8_t N_SQUARES_PER_LINE = 8;
 constexpr uint8_t HIST_SZ = 8;
 
 /// assume same-sized matrixes as params
 std::vector<double> calcHistogramHog(const Matrix<double> &square,
                                      const Matrix<double> &abs,
-                                     const Matrix<double> &angles,
-                                     uint histSz = HIST_SZ)
+                                     const Matrix<double> &angles)
 {
-    std::vector<double> hist(histSz, static_cast<double>(0));
+    std::vector<double> hist(HIST_SZ, static_cast<double>(0));
     for (uint i = 0; i < square.n_rows; i++) {
         for (uint j = 0; j < square.n_cols; j++) {
-            double tmpIdx = (static_cast<double>(M_PI) + angles(i, j)) * histSz / 2 / M_PI;
-            uint idx = uint(tmpIdx) % histSz/*normalizeNumber(tmpIdx, static_cast<uint>(0), histSz - 1)*/;
+            double tmpIdx = (static_cast<double>(M_PI) + angles(i, j)) * HIST_SZ / 2 / M_PI;
+            uint idx = uint(tmpIdx) % HIST_SZ/*normalizeNumber(tmpIdx, static_cast<uint>(0), HIST_SZ - 1)*/;
             hist[idx] += abs(i, j);
         }
     }
     return hist;
+}
+
+std::vector<double> calcHistogramLbp(const Matrix<double> &square)
+{
+    auto matrix = square.unary_map(CompareOp<double>{});
+    constexpr auto LBP_HIST_SZ = 256;
+    std::vector<double> hist(LBP_HIST_SZ, static_cast<double>(0));
+    for (uint i = 0; i < matrix.n_rows; i++) {
+        for (uint j = 0; j < matrix.n_cols; j++) {
+            hist[matrix(i, j)]++;
+        }
+    }
+    return hist;
+}
+
+std::vector<double> calcHistogramColor(const Matrix<std::tuple<uint, uint, uint>> &square)
+{
+    double r = 0, g = 0, b = 0;
+
+    for (uint i = 0; i < square.n_rows; i++) {
+        for (uint j = 0; j < square.n_cols; j++) {
+            r += std::get<0>(square(i, j));
+            g += std::get<1>(square(i, j));
+            b += std::get<2>(square(i, j));
+        }
+    }
+    r /= square.n_rows * square.n_cols * 255;
+    g /= square.n_rows * square.n_cols * 255;
+    b /= square.n_rows * square.n_cols * 255;
+    return std::vector<double>{r, g, b};
 }
 
 
@@ -149,89 +182,58 @@ std::vector<float> calculateHog(BMP &img)
     assert(n >= N_SQUARES_PER_LINE);
     assert(m >= N_SQUARES_PER_LINE);
     // iterate over squares
-    std::vector<std::vector<double>> hists;
-    for (uint i = 0, iStep = n / N_SQUARES_PER_LINE; i + iStep < n; i += iStep) {
-        for (uint j = 0, jStep = m / N_SQUARES_PER_LINE; j + jStep < m; j += iStep) {
+    std::vector<float> desc;
+    for (uint i = 0, iStep = n / N_SQUARES_PER_LINE; i + iStep <= n; i += iStep) {
+        for (uint j = 0, jStep = m / N_SQUARES_PER_LINE; j + jStep <= m; j += iStep) {
             auto hist = calcHistogramHog(imgMatrix.submatrix(i, j, iStep, jStep),
                                          abs.submatrix(i, j, iStep, jStep),
                                          angles.submatrix(i, j, iStep, jStep));
             // part5: normalise hists
             normaliseHist(hist);
-            hists.emplace_back(hist);
+            // part6: concatenate
+            desc.insert(desc.end(), hist.begin(), hist.end());
         }
     }
+    return desc;
+}
 
-    // part6: concatenate
+std::vector<float> calculateLbp(BMP &img)
+{
+    auto n = static_cast<uint>(img.TellHeight());
+    auto m = static_cast<uint>(img.TellWidth());
+    assert(n >= N_SQUARES_PER_LINE);
+    assert(m >= N_SQUARES_PER_LINE);
+
+    auto imgMatrix = grayscale(img);
+
+    // iterate over squares
     std::vector<float> desc;
-    for (const auto &hist : hists) {
-        desc.insert(desc.end(), hist.begin(), hist.end());
+    for (uint i = 0, iStep = n / N_SQUARES_PER_LINE; i + iStep <= n; i += iStep) {
+        for (uint j = 0, jStep = m / N_SQUARES_PER_LINE; j + jStep <= m; j += iStep) {
+            auto hist = calcHistogramLbp(imgMatrix.submatrix(i, j, iStep, jStep));
+            normaliseHist(hist);
+            desc.insert(desc.end(), hist.begin(), hist.end());
+        }
     }
     return desc;
 }
 
-std::vector<double> calcHistogramLbp(const Matrix<double> &square)
-{
-    auto matrix = square.unary_map(CompareOp<double>{});
-    constexpr auto LbpHistSz = 256;
-    std::vector<double> hist(LbpHistSz, 0);
-    for (uint i = 0; i < matrix.n_rows; i++) {
-        for (uint j = 0; j < matrix.n_cols; j++) {
-            hist[matrix(i, j)]++;
-        }
-    }
-    return hist;
-}
-
-std::vector<uint> calculateLbp(BMP &img)
+std::vector<float> calculateColor(BMP &img)
 {
     auto n = static_cast<uint>(img.TellHeight());
     auto m = static_cast<uint>(img.TellWidth());
     assert(n >= N_SQUARES_PER_LINE);
     assert(m >= N_SQUARES_PER_LINE);
 
-    auto imgMatrix = grayscale(img);
+    auto imgMatrix = origin(img);
 
     // iterate over squares
-    std::vector<std::vector<double>> hists;
-    for (uint i = 0, iStep = n / N_SQUARES_PER_LINE; i + iStep < n; i += iStep) {
-        for (uint j = 0, jStep = m / N_SQUARES_PER_LINE; j + jStep < m; j += iStep) {
-            auto hist = calcHistogramLbp(imgMatrix.submatrix(i, j, iStep, jStep));
-            normaliseHist(hist);
-            hists.emplace_back(hist);
+    std::vector<float> desc;
+    for (uint i = 0, iStep = n / N_SQUARES_PER_LINE; i + iStep <= n; i += iStep) {
+        for (uint j = 0, jStep = m / N_SQUARES_PER_LINE; j + jStep <= m; j += iStep) {
+            auto hist = calcHistogramColor(imgMatrix.submatrix(i, j, iStep, jStep));
+            desc.insert(desc.end(), hist.begin(), hist.end());
         }
-    }
-
-    // part6: concatenate
-    std::vector<uint> desc;
-    for (const auto &hist : hists) {
-        desc.insert(desc.end(), hist.begin(), hist.end());
-    }
-    return desc;
-}
-
-std::vector<uint> calculateColor(BMP &img)
-{
-    auto n = static_cast<uint>(img.TellHeight());
-    auto m = static_cast<uint>(img.TellWidth());
-    assert(n >= N_SQUARES_PER_LINE);
-    assert(m >= N_SQUARES_PER_LINE);
-
-    auto imgMatrix = grayscale(img);
-
-    // iterate over squares
-    std::vector<std::vector<double>> hists;
-    for (uint i = 0, iStep = n / N_SQUARES_PER_LINE; i + iStep < n; i += iStep) {
-        for (uint j = 0, jStep = m / N_SQUARES_PER_LINE; j + jStep < m; j += iStep) {
-            auto hist = calcHistogramLbp(imgMatrix.submatrix(i, j, iStep, jStep));
-            normaliseHist(hist);
-            hists.emplace_back(hist);
-        }
-    }
-
-    // part6: concatenate
-    std::vector<uint> desc;
-    for (const auto &hist : hists) {
-        desc.insert(desc.end(), hist.begin(), hist.end());
     }
     return desc;
 }
@@ -245,23 +247,27 @@ std::vector<uint> calculateColor(BMP &img)
 void ExtractFeatures(const TDataSet& data_set, TFeatures* features)
 {
     for (const auto &elem : data_set) {
-        auto &img = *(elem.first);  // non-const reference because of BMP class architecture
+        auto &img = *(elem.first);  // reference is not const because of BMP class architecture
         const auto &label = elem.second;
 
         // check input
         assert(img.TellHeight() <= static_cast<long long int>(std::numeric_limits<uint>::max()) && img.TellHeight() >= 0);
         assert(img.TellWidth() <= static_cast<long long int>(std::numeric_limits<uint>::max()) && img.TellWidth() >= 0);
+
         auto hogDesc = calculateHog(img);
         auto lbpDesc = calculateLbp(img);
-//        auto colorDesc = calculateColor(img);
+        auto colorDesc = calculateColor(img);
 
         std::vector<float> desc;
         desc.insert(desc.end(), hogDesc.begin(), hogDesc.end());
         desc.insert(desc.end(), lbpDesc.begin(), lbpDesc.end());
-//        desc.insert(desc.end(), colorDesc.begin(), colorDesc.end());
+        desc.insert(desc.end(), colorDesc.begin(), colorDesc.end());
         features->emplace_back(std::make_pair(desc, label));
     }
 }
+
+//**********************************End of my code********************************************
+
 
 // Clear dataset structure
 void ClearDataset(TDataSet* data_set) {

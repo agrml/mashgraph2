@@ -15,6 +15,18 @@ Matrix<double> grayscale(BMP &img)
     return imgMatrix;
 }
 
+Matrix<std::tuple<uint, uint, uint>> origin(BMP &img)
+{
+    Matrix<std::tuple<uint, uint, uint>> imgMatrix(static_cast<uint>(img.TellHeight()),
+                                                   static_cast<uint>(img.TellWidth()));
+    for (uint i = 0; i < imgMatrix.n_rows; ++i) {
+        for (uint j = 0; j < imgMatrix.n_cols; ++j) {
+            RGBApixel *p = img(j, i);
+            imgMatrix(i, j) = std::make_tuple(p->Red, p->Green, p->Blue);
+        }
+    }
+    return imgMatrix;
+}
 
 
 Matrix<double> sobel_x(const Matrix<double> &src_image) {

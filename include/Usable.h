@@ -6,6 +6,8 @@
 
 Matrix<double> grayscale(BMP &img);
 
+Matrix<std::tuple<uint, uint, uint>> origin(BMP &img);
+
 template <typename T>
 class ConvolutionOp
 {
