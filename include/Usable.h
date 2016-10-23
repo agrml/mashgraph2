@@ -96,3 +96,19 @@ T ConvolutionOp<T>::operator()(const Matrix<T> &neighbourhood) const
     }
     return sum;
 }
+
+template <typename T>
+Matrix<T> extraMatrix(const Matrix<T> &src, uint newNRows, uint newNCols)
+{
+    Matrix<T> ans(newNRows, newNCols);
+    for (uint i = 0; i < ans.n_rows; i++) {
+        for (uint j = 0; j < ans.n_cols; j++) {
+            if (i < src.n_rows && j < src.n_cols) {
+                ans(i, j) = src(i, j);
+            } else {
+                ans(i, j) = T{};
+            }
+        }
+    }
+    return ans;
+}

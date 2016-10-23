@@ -139,16 +139,18 @@ std::vector<double> calcHistogramColor(const Matrix<std::tuple<uint, uint, uint>
 
 void normaliseHist(vector<double> &hist)
 {
+    constexpr auto EPS = 0.00000001;
     double norm = 0;
     for (const auto &elem : hist) {
         norm += elem * elem;
     }
     norm = std::sqrt(norm);
-    for (auto &elem : hist) {
-        elem /= norm;
-        if (elem > 1 || std::isnan(elem)) {
-            elem = 1;
-        } else if (elem < 0) {
+    if (norm > EPS) {
+        for (auto &elem : hist) {
+            elem /= norm;
+        }
+    } else {
+        for (auto &elem : hist) {
             elem = 0;
         }
     }
@@ -158,9 +160,11 @@ std::vector<float> calculateHog(BMP &img)
 {
     auto n = static_cast<uint>(img.TellHeight());
     auto m = static_cast<uint>(img.TellWidth());
+    n = n + (n % N_SQUARES_PER_LINE ? N_SQUARES_PER_LINE - n % N_SQUARES_PER_LINE : 0);
+    m = m + (m % N_SQUARES_PER_LINE ? N_SQUARES_PER_LINE - m % N_SQUARES_PER_LINE : 0);
 
     // part1
-    auto imgMatrix = grayscale(img);
+    auto imgMatrix = extraMatrix(grayscale(img), n, m);
 
     // part2: Sobel convolution
     auto xProj = sobel_x(imgMatrix);
@@ -201,10 +205,11 @@ std::vector<float> calculateLbp(BMP &img)
 {
     auto n = static_cast<uint>(img.TellHeight());
     auto m = static_cast<uint>(img.TellWidth());
-    assert(n >= N_SQUARES_PER_LINE);
-    assert(m >= N_SQUARES_PER_LINE);
+    n = n + (n % N_SQUARES_PER_LINE ? N_SQUARES_PER_LINE - n % N_SQUARES_PER_LINE : 0);
+    m = m + (m % N_SQUARES_PER_LINE ? N_SQUARES_PER_LINE - m % N_SQUARES_PER_LINE : 0);
 
-    auto imgMatrix = grayscale(img);
+    // part1
+    auto imgMatrix = extraMatrix(grayscale(img), n, m);
 
     // iterate over squares
     std::vector<float> desc;
@@ -222,10 +227,11 @@ std::vector<float> calculateColor(BMP &img)
 {
     auto n = static_cast<uint>(img.TellHeight());
     auto m = static_cast<uint>(img.TellWidth());
-    assert(n >= N_SQUARES_PER_LINE);
-    assert(m >= N_SQUARES_PER_LINE);
+    n = n + (n % N_SQUARES_PER_LINE ? N_SQUARES_PER_LINE - n % N_SQUARES_PER_LINE : 0);
+    m = m + (m % N_SQUARES_PER_LINE ? N_SQUARES_PER_LINE - m % N_SQUARES_PER_LINE : 0);
 
-    auto imgMatrix = origin(img);
+    // part1
+    auto imgMatrix = extraMatrix(origin(img), n, m);
 
     // iterate over squares
     std::vector<float> desc;
@@ -254,14 +260,14 @@ void ExtractFeatures(const TDataSet& data_set, TFeatures* features)
         assert(img.TellHeight() <= static_cast<long long int>(std::numeric_limits<uint>::max()) && img.TellHeight() >= 0);
         assert(img.TellWidth() <= static_cast<long long int>(std::numeric_limits<uint>::max()) && img.TellWidth() >= 0);
 
-        auto hogDesc = calculateHog(img);
+//        auto hogDesc = calculateHog(img);
         auto lbpDesc = calculateLbp(img);
-        auto colorDesc = calculateColor(img);
+//        auto colorDesc = calculateColor(img);
 
         std::vector<float> desc;
-        desc.insert(desc.end(), hogDesc.begin(), hogDesc.end());
+//        desc.insert(desc.end(), hogDesc.begin(), hogDesc.end());
         desc.insert(desc.end(), lbpDesc.begin(), lbpDesc.end());
-        desc.insert(desc.end(), colorDesc.begin(), colorDesc.end());
+//        desc.insert(desc.end(), colorDesc.begin(), colorDesc.end());
         features->emplace_back(std::make_pair(desc, label));
     }
 }
