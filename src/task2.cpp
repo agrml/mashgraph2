@@ -20,6 +20,29 @@
 
 #endif
 
+/**
+ * @mainpage Progect2: Описание
+ *
+ * На основе задания машграфа опробированы векторное расширение процессора и система документации Doxygen.
+
+SSE использван в применении филтров Собеля (оператор свертки):
+    task2.cpp -> std::vector<float> calculateHog(BMP &img)
+и вычислении нормы градиента:
+    usual.cpp -> double ConvolutionOp::operator()(const Matrix<double> &neighbourhood) const
+Производительность была замерена на надоре картинок из задания по машграфу. На этих 345 файлах суммароное время вычисления дескриптора составило (среднее по 3 запускам):
+    - 0.3636 -- SSE [0.001053 per image]
+    - 0.3490 -- original [0.001011 per image]
+Отсутствие выигрыша обосновывается дополнительными временными затрарами на загрузку данных в m128d переменные и выгрузку обратно в double. А 2 пременных за одну интсрукцию -- не столь большой выигрыш при таких затратах. В качестве решения предлагается переписать бальшую часть кода с использованием sse, что затронит логику вычислений, да и выходит за необходимые условия Задания.
+
+С использованием Doxygen составлена документация к коду.
+Note: Как коворится, на вопрос "что" должен отвечать сам код, а документация должна отвечать на вопрос "почему". Но "почему" расписано на 14 страницах задания по машграфу и нету смысла заниматься копипастом.
+ */
+
+/**
+ * @file
+ * @author Mikhail Agranovskiy, 321, cs msu
+ */
+
 using std::string;
 using std::vector;
 using std::ifstream;
@@ -88,7 +111,9 @@ void SavePredictions(const TFileList& file_list,
 
 //**********************************Okay, my code starts here********************************************
 
+/// source image will be splited to thet number of squares
 constexpr uint8_t N_SQUARES_PER_LINE = 8;
+/// size of histogram (number of sections in 2pi interval)
 constexpr uint8_t HIST_SZ = 8;
 
 /// assume same-sized matrixes as params
@@ -107,6 +132,7 @@ std::vector<double> calcHistogramHog(const Matrix<double> &square,
     return hist;
 }
 
+/// normalize histogram of dubles
 void normaliseHist(vector<double> &hist)
 {
     double norm = 0;
@@ -120,7 +146,13 @@ void normaliseHist(vector<double> &hist)
         }
     }
 }
-
+/**
+ * Calculate HOG descriptor for source image.
+ *
+ * SSE intrinsics are used in implementation.
+ * @param img source image
+ * @return HOG descriptor
+ */
 std::vector<float> calculateHog(BMP &img)
 {
     auto n = static_cast<uint>(img.TellHeight());
@@ -140,9 +172,17 @@ std::vector<float> calculateHog(BMP &img)
     Matrix<double> abs(n, m);
     /// gradients directions
     Matrix<double> angles(n, m);
+    __m128d absSse;
+    double absUsual[2];
     for (uint i = 0; i < n; i++) {
         for (uint j = 0; j < m; j++) {
-            abs(i, j) = std::sqrt(std::pow(xProj(i, j), 2) + std::pow(yProj(i, j), 2));
+            absSse = _mm_setr_pd(xProj(i, j), yProj(i, j));
+            absSse = _mm_mul_pd(absSse, absSse);
+            _mm_storeu_pd(absUsual, absSse);
+            abs(i, j) = absUsual[0] + absUsual[1];
+
+            // abs(i, j) = std::sqrt(std::pow(xProj(i, j), 2) + std::pow(yProj(i, j), 2));
+
             angles(i, j) = std::atan2(yProj(i,j), xProj(i, j));
         }
     }

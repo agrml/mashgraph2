@@ -4,49 +4,42 @@
 #include "EasyBMP.h"
 #include <assert.h>
 
+/**
+ * @file
+ * @author Mikhail Agranovskiy, 321, cs msu
+ */
+
+/**
+ * Calulate grayscale image.
+ * @param img source image
+ * @return grayscale matrix
+ */
 Matrix<double> grayscale(BMP &img);
 
-Matrix<std::tuple<uint, uint, uint>> origin(BMP &img);
-
+/**
+ * Functor to be used in unary_map tp implement custom filter
+ */
 class ConvolutionOp
 {
+    /// kernel of convolution
     Matrix<double> kernel_;
 public:
+    /// size of kernel
     uint radius = 0;
+    /// fix for use inary_map
     uint &vert_radius = radius, &hor_radius = radius;
+    /// constructur, yeah
     ConvolutionOp(const Matrix<double> &kernel);
+    /// function as is
     double operator()(const Matrix<double> &neighbourhood) const;
 };
 
-template <typename T>
-class CompareOp
-{
-public:
-    uint radius = 1;
-    uint &vert_radius = radius, &hor_radius = radius;
-    uint8_t operator()(const Matrix<T> &neighbourhood) const;
-};
-
-template <typename T>
-uint8_t CompareOp<T>::operator()(const Matrix<T> &neighbourhood) const
-{
-    // matrices "multiplication"
-    assert(neighbourhood.n_cols == neighbourhood.n_rows);
-    assert(radius == 1);
-
-    uint8_t sum = 0;
-    for (uint i = 0; i < 3 ; i++) {
-        for (uint j = 0; j < 3; j++) {
-            if (i != 1 && j != 1) {
-                sum <<= 1;
-                sum += (neighbourhood(1, 1) <= neighbourhood(i, j));
-            }
-        }
-    }
-    return sum;
-}
-
-// convolution filter
+/**
+ * Implementation of convolution filter
+ * @param src_image src image
+ * @param kernel convolution kernel
+ * @return result of usage of the filter
+ */
 template <typename T>
 Matrix<T> custom(Matrix<T> src_image, const Matrix<double> &kernel)
 {
@@ -54,10 +47,19 @@ Matrix<T> custom(Matrix<T> src_image, const Matrix<double> &kernel)
     return src_image.unary_map(ConvolutionOp{kernel});
 }
 
+/// Sobel for x
 Matrix<double> sobel_x(const Matrix<double> &src_image);
 
+/// Sobel for y
 Matrix<double> sobel_y(const Matrix<double> &src_image);
 
+/**
+ * Перед разбиением на клетки изображение расширяется так, чтобы поделиться нацело. Ввыброно дополнение константой (конкретно, нулем) -- чтобы вклад краев не превосходил вклад других клеток.
+ * @param src
+ * @param newNRows
+ * @param newNCols
+ * @return
+ */
 template <typename T>
 Matrix<T> extraMatrix(const Matrix<T> &src, uint newNRows, uint newNCols)
 {

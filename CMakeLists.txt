@@ -25,3 +25,5 @@ link_directories(
 )
 
 add_subdirectory(src)
+
+add_custom_target(doc cd .. && doxygen Doxyfile)

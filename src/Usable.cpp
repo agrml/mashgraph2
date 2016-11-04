@@ -1,6 +1,11 @@
 #include "Usable.h"
 #include <assert.h>
 
+/**
+ * @file
+ * @author Mikhail Agranovskiy, 321, cs msu
+ */
+
 Matrix<double> grayscale(BMP &img)
 {
     constexpr double R_COEF = 0.229, G_COEF = 0.587, B_COEF = 0.144;
