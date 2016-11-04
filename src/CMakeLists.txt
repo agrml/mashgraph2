@@ -1,7 +1,7 @@
 set(SOURCE_FILES
+        matrix.hpp
         task2.cpp
         Usable.cpp
-        ../include
 )
 
 
