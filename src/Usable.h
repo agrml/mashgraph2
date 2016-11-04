@@ -8,7 +8,6 @@ Matrix<double> grayscale(BMP &img);
 
 Matrix<std::tuple<uint, uint, uint>> origin(BMP &img);
 
-template <typename T>
 class ConvolutionOp
 {
     Matrix<double> kernel_;
@@ -16,7 +15,7 @@ public:
     uint radius = 0;
     uint &vert_radius = radius, &hor_radius = radius;
     ConvolutionOp(const Matrix<double> &kernel);
-    T operator()(const Matrix<T> &neighbourhood) const;
+    double operator()(const Matrix<double> &neighbourhood) const;
 };
 
 template <typename T>
@@ -52,32 +51,12 @@ template <typename T>
 Matrix<T> custom(Matrix<T> src_image, const Matrix<double> &kernel)
 {
     assert(kernel.n_rows == kernel.n_cols);
-    return src_image.unary_map(ConvolutionOp<double>{kernel});
+    return src_image.unary_map(ConvolutionOp{kernel});
 }
 
 Matrix<double> sobel_x(const Matrix<double> &src_image);
 
 Matrix<double> sobel_y(const Matrix<double> &src_image);
-
-template <typename T>
-ConvolutionOp<T>::ConvolutionOp(const Matrix<double> &kernel) : kernel_(kernel),
-                                                                radius((kernel.n_rows - 1) / 2) {}
-
-template <typename T>
-T ConvolutionOp<T>::operator()(const Matrix<T> &neighbourhood) const
-{
-    // matrices "multiplication"
-    assert(neighbourhood.n_cols == neighbourhood.n_rows);
-    assert(radius == (neighbourhood.n_cols - 1) / 2);
-
-    T sum = 0;
-    for (size_t i = 0; i < 2 * radius + 1 ; i++) {
-        for (size_t j = 0; j < 2 * radius + 1; j++) {
-            sum += neighbourhood(i, j) * kernel_(i, j);
-        }
-    }
-    return sum;
-}
 
 template <typename T>
 Matrix<T> extraMatrix(const Matrix<T> &src, uint newNRows, uint newNCols)

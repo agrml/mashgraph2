@@ -12,6 +12,7 @@
 #include "argvparser.h"
 
 #include "Usable.h"
+#include "timer.h"
 
 #ifdef DEBUG
 #include <glog/logging.h>
@@ -173,6 +174,7 @@ std::vector<float> calculateHog(BMP &img)
  */
 void ExtractFeatures(const TDataSet& data_set, TFeatures* features)
 {
+    double timeSum = 0;
     for (const auto &elem : data_set) {
         auto &img = *(elem.first);  // reference is not const because of BMP class architecture
         const auto &label = elem.second;
@@ -181,9 +183,15 @@ void ExtractFeatures(const TDataSet& data_set, TFeatures* features)
         assert(img.TellHeight() <= static_cast<long long int>(std::numeric_limits<uint>::max()) && img.TellHeight() >= 0);
         assert(img.TellWidth() <= static_cast<long long int>(std::numeric_limits<uint>::max()) && img.TellWidth() >= 0);
 
+        Timer t;
+
+        t.start();
         auto hogDesc = calculateHog(img);
+        timeSum += t.ret();
         features->emplace_back(std::make_pair(hogDesc, label));
     }
+    std::cout << "Summary time: " << timeSum << std::endl;
+
 }
 
 //**********************************End of my code********************************************

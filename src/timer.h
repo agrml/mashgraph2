@@ -31,6 +31,7 @@ public:
 	void stop(const char* msg = 0);
 	void check(const char* msg = 0);
 	void check(const char* msg, int msg_count);
+	double ret();
 
 }; // class Timer
 
@@ -117,7 +118,13 @@ inline void Timer::check(const char* msg)
 	std::cout << "Time [" << std::setiosflags(std::ios::fixed)
 			<< std::setprecision(3) << acc_time
 			+ (running ? elapsed_time() : 0) << "] seconds\n";
-} // Timer::check
+}
+
+
+inline double Timer::ret()
+{
+	return acc_time + (running ? elapsed_time() : 0);
+}
 
 inline void Timer::check(const char* msg, int msg_count)
 {
