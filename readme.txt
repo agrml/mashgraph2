@@ -18,7 +18,7 @@ cd build && cmake .. && make <doc or nothing>
 SSE использван в применении филтров Собеля (оператор свертки):
     task2.cpp -> std::vector<float> calculateHog(BMP &img)
 и вычислении нормы градиента:
-    usual.cpp -> double ConvolutionOp::operator()(const Matrix<double> &neighbourhood) const
+    usual.cpp -> double ConvolutionOpSse::operator()(const Matrix<double> &neighbourhood) const
 Производительность была замерена на надоре картинок из задания по машграфу. На этих 345 файлах суммароное время вычисления дескриптора составило (среднее по 3 запускам):
     - 0.3636 -- SSE [0.001053 per image]
     - 0.3490 -- original [0.001011 per image]

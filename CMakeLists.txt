@@ -9,6 +9,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-effc++")
 find_package(PkgConfig)
 pkg_check_modules(GLOG REQUIRED libglog)
 
+# Locate GTest
+find_package(GTest REQUIRED)
+include_directories(${GTEST_INCLUDE_DIRS})
 
 # assume that libs have already been built
 include_directories(
